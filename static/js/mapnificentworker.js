@@ -5,6 +5,7 @@ var mapnificentPoster;
 
 var mapnificentWorker = (function(undefined) {
   'use strict';
+
   var calculateTimes = function(nextStations, lines, secondsPerM, maxWalkTime, debug) {
     var nsl = nextStations.length,
       uberNextStations = [], count = 0,
@@ -12,7 +13,7 @@ var mapnificentWorker = (function(undefined) {
       stay, seconds, line, nextSeconds, nextwalkTime, waittime, fromStation,
       testWalkTime, walkTime, closeStations = {}, trace, next;
 
-    while (nsl > 0){ // as long as we have next stations to go
+    while (nsl > 0) { // as long as we have next stations to go
       for (i = 0; i < nsl; i += 1){
         count += 1;
         // Reporting progress to main thread occasionally
@@ -59,10 +60,10 @@ var mapnificentWorker = (function(undefined) {
         */
         if (line !== -1 && stationMap[stationId] !== undefined &&
                            stationMap[stationId] <= seconds){
-          for (j = 0; j < travelOptionLength; j += 1){
+          for (j = 0; j < travelOptionLength; j += 1) {
             rStation = station.TravelOptions[j];
             rStation.Stop = rStation.Stop || 0;
-            if(rStation.Stop != fromStation && rStation.Line === line){
+            if(rStation.Stop !== fromStation && rStation.Line === line){
               nextSeconds = seconds + (rStation.TravelTime || 0) + stay;
               if (stationMap[rStation.Stop] === undefined ||
                   stationMap[rStation.Stop] > nextSeconds) {
@@ -85,11 +86,12 @@ var mapnificentWorker = (function(undefined) {
           continue;
         }
         // If I arrived faster before at this station, continue;
-        if(stationMap[stationId] !== undefined && stationMap[stationId] <= seconds){
+        if(stationMap[stationId] !== undefined && stationMap[stationId] <= seconds) {
           continue;
         }
         // If I arrived here the fastest, record the time
         stationMap[stationId] = seconds;
+
         if (debug) {
           debugMap[stationId] = trace.slice();
         }
@@ -196,12 +198,16 @@ var mapnificentWorker = (function(undefined) {
       nsl = nextStations.length;
       uberNextStations = [];
     }
+
     return count;
   };
 
   var stationMap, debugMap, stations, lines, reportInterval, searchRadius, quadtree;
 
   return function(event) {
+
+    // console.log('Event: ', event);
+
     stationMap = {};
     stations = event.data.stations;
     lines = event.data.lines;
@@ -212,6 +218,8 @@ var mapnificentWorker = (function(undefined) {
       event.data.bounds[2], event.data.bounds[3]
     );
     quadtree.insertAll(stations);
+
+    console.log('Worker Quadtree: ', quadtree);
 
     var startLat = event.data.lat,
       startLng = event.data.lng,
@@ -224,6 +232,8 @@ var mapnificentWorker = (function(undefined) {
     if (debug) {
       debugMap = {};
     }
+
+    // console.log('secondsPerM: ', secondsPerM);
 
     // throw away any timezones that are not the requested ones
     for(var line in lines){
@@ -239,11 +249,14 @@ var mapnificentWorker = (function(undefined) {
     );
 
     var startStations = [];
+
     for (var k = 0; k < nextStations.length; k += 1) {
+
       var stationId = nextStations[k][0].id;
       var distance = nextStations[k][1];
       var seconds = distance * secondsPerM;
-      if (seconds <= maxWalkTime){
+
+      if (seconds <= maxWalkTime) {
         startStations.push({
           stationId: stationId,
           line: -1,  // walking to station
@@ -254,6 +267,14 @@ var mapnificentWorker = (function(undefined) {
         });
       }
     }
+
+    console.log('Start Stations: ', startStations);
+    console.log('Next Stations: ', nextStations);
+    console.log('optimizedLines: ', optimizedLines);
+    // console.log('Max Walk Time: ', maxWalkTime);
+    // console.log('searchRadius: ', searchRadius);
+    // console.log('Station Map before: ', stationMap);
+
     var count = calculateTimes(startStations, optimizedLines, secondsPerM, maxWalkTime, debug);
 
     if (reportInterval !== 0) {
@@ -265,6 +286,7 @@ var mapnificentWorker = (function(undefined) {
     }
     mapnificentPoster(result);
   };
+
 }());
 
 onmessage = mapnificentWorker;

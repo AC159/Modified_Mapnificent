@@ -46,6 +46,12 @@ function Quadtree(centerX, centerY, halfdimX, halfdimY) {
 }
 
 Quadtree.create = function(minLat, maxLat, minLng, maxLng) {
+
+  console.log('minLat', minLat);
+  console.log('maxLat', maxLat);
+  console.log('minLng', minLng);
+  console.log('maxLng', maxLng);
+
   var halfdimX = (maxLng - minLng) / 2;
   var halfdimY = (maxLat - minLat) / 2;
   var centerX = halfdimX + minLng;

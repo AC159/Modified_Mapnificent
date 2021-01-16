@@ -157,6 +157,7 @@ MapnificentPosition.prototype.createWorker = function(){
 };
 
 MapnificentPosition.prototype.workerMessage = function() {
+
   var self = this;
   return function(event){
     if (event.data.status === 'working') {
@@ -164,9 +165,12 @@ MapnificentPosition.prototype.workerMessage = function() {
       self.updateProgress();
     }
     else if (event.data.status === 'done') {
-      console.log('Count loops', event.data.count);
+      console.log('Event.data: ', event.data);
       self.updateProgress(100);
       self.updateControls();
+
+      console.log('Station Map: ', event.data.stationMap);
+
       self.stationMap = event.data.stationMap;
       self.debugMap = event.data.debugMap;
       self.mapnificent.redraw();
@@ -180,7 +184,7 @@ MapnificentPosition.prototype.workerError = function(){
   };
 };
 
-MapnificentPosition.prototype.startCalculation = function(){
+MapnificentPosition.prototype.startCalculation = function() {
   this.renderProgress();
   this.marker.openPopup();
   this.createWorker();
@@ -214,10 +218,11 @@ MapnificentPosition.prototype.getReachableStations = function(stationsAround, st
   var maxWalkTime = this.mapnificent.settings.maxWalkTime;
   var secondsPerKm = this.mapnificent.settings.secondsPerKm;
 
-
   var convert = function(station, reachableIn) {
+
     var secs = Math.min((self.time - reachableIn), maxWalkTime);
     var mradius = secs * (1 / secondsPerKm) * 1000;
+
     var point = new L.LatLng(station.lat, station.lng);
 
     var lngRadius = getLngRadius(station.lat, mradius);
@@ -254,12 +259,12 @@ MapnificentPosition.prototype.getReachableStations = function(stationsAround, st
     if (stationTime === undefined || stationTime >= this.time) {
       continue;
     }
-
     station = convert(stationsAround[i], stationTime);
     if (station !== null) {
       stations.push(station);
     }
   }
+
   return stations;
 };
 
@@ -297,7 +302,7 @@ function Mapnificent(map, city, pageConfig){
   this.settings = $.extend(this.settings, pageConfig);
 }
 
-Mapnificent.prototype.init = function(){
+Mapnificent.prototype.init = function() {
   var self = this, t0;
   self.tilesLoading = false;
   return this.loadData().done(function(data){
@@ -367,7 +372,7 @@ Mapnificent.prototype.logDebugMessage = function(latlng) {
             toStop.Latitude, toStop.Longitude
           )
         }
-        if (lastTransport != stop.line) {
+        if (lastTransport !== stop.line) {
           console.log(k, 'Switching transport to', self.lineNames[stop.line],
                       'waiting: ', stop.waittime);
         }
@@ -398,6 +403,7 @@ Mapnificent.prototype.loadData = function(){
   const MAPNIFICENT_PROTO = {"nested":{"mapnificent":{"nested":{"MapnificentNetwork":{"fields":{"Cityid":{"type":"string","id":1},"Stops":{"rule":"repeated","type":"Stop","id":2},"Lines":{"rule":"repeated","type":"Line","id":3}},"nested":{"Stop":{"fields":{"Latitude":{"type":"double","id":1},"Longitude":{"type":"double","id":2},"TravelOptions":{"rule":"repeated","type":"TravelOption","id":3},"Name":{"type":"string","id":4}},"nested":{"TravelOption":{"fields":{"Stop":{"type":"uint32","id":1},"TravelTime":{"type":"uint32","id":2},"StayTime":{"type":"uint32","id":3},"Line":{"type":"string","id":4},"WalkDistance":{"type":"uint32","id":5}}}}},"Line":{"fields":{"LineId":{"type":"string","id":1},"LineTimes":{"rule":"repeated","type":"LineTime","id":2},"Name":{"type":"string","id":3}},"nested":{"LineTime":{"fields":{"Interval":{"type":"uint32","id":1},"Start":{"type":"uint32","id":2},"Stop":{"type":"uint32","id":3},"Weekday":{"type":"uint32","id":4}}}}}}}}}}};
 
   var protoRoot = protobuf.Root.fromJSON(MAPNIFICENT_PROTO);
+  console.log(protoRoot)
 
   var d = $.Deferred();
 
@@ -410,10 +416,34 @@ Mapnificent.prototype.loadData = function(){
   oReq.open("GET", dataUrl, true);
   oReq.responseType = "arraybuffer";
 
+  var enc = new TextDecoder("utf-8");
+
   oReq.onload = function(oEvent) {
     var MapnificentNetwork = protoRoot.lookupType('mapnificent.MapnificentNetwork');
+
     console.log('received binary', new Date().getTime());
+
+    // function download(filename, text) {
+    //   var element = document.createElement('a');
+    //   element.setAttribute('href', `data:text/plain;charset=utf-8, \n${text.toString()}`);
+    //   element.setAttribute('download', filename);
+    //
+    //   element.style.display = 'none';
+    //   document.body.appendChild(element);
+    //
+    //   element.click();
+    //
+    //   document.body.removeChild(element);
+    // }
+
+    console.log('Message: ', message);
+
+    // download("message.txt", message);
+
+    console.log('Event response: ', oEvent.target.response);
+
     var message = MapnificentNetwork.decode(new Uint8Array(oEvent.target.response));
+
     console.log('decoded message', new Date().getTime());
     loadProgress.modal('hide');
     d.resolve(message);
@@ -441,6 +471,24 @@ Mapnificent.prototype.getLineTimesByInterval = function(lineTimes) {
 }
 
 Mapnificent.prototype.prepareData = function(data) {
+
+  function download(filename, text) {
+
+    var element = document.createElement('a');
+    element.setAttribute('href', `data:text/plain;charset=utf-8, \n${text.toString()}`);
+    element.setAttribute('download', filename);
+
+    element.style.display = 'none';
+    document.body.appendChild(element);
+
+    element.click();
+
+    document.body.removeChild(element);
+  }
+
+  console.log('Data: ', data);
+  download("data.txt", JSON.stringify(data));
+
   this.stationList = data.Stops;
   this.lines = {};
   this.lineNames = {};
@@ -465,14 +513,25 @@ Mapnificent.prototype.prepareData = function(data) {
   }
   var b = 0.01;
   this.settings.bounds = [selat - b, nwlat + b, nwlng - b, selng + b];
+
+  console.log('Setting bounds: ', this.settings.bounds)
+
   this.quadtree = Quadtree.create(
     this.settings.bounds[0], this.settings.bounds[1],
     this.settings.bounds[2], this.settings.bounds[3]
   );
+
+  console.log('Quadtree: ', this.quadtree);
+  console.log('Station List: ', this.stationList);
   this.quadtree.insertAll(this.stationList);
+
+  // -73.564453125,45.506828120969516
+  var points = this.quadtree.searchInRadius(45.506828120969516, -73.564453125, 1000);
+  console.log(points);
+
 };
 
-Mapnificent.prototype.redraw = function(){
+Mapnificent.prototype.redraw = function() {
   var self = this;
   this.needsRedraw = true;
   if (this.canvasTileLayer) {
@@ -522,7 +581,7 @@ Mapnificent.prototype.drawTile = function() {
     */
 
     var tileSize = this.options.tileSize;
-    var start = tilePoint.multiplyBy(tileSize);
+    var start = tilePoint.multiplyBy(tileSize);  // tileSize = 256
     var end = start.add([tileSize, 0]);
     var startLatLng = this._map.unproject(start);
     var endLatLng = this._map.unproject(end);
@@ -534,6 +593,7 @@ Mapnificent.prototype.drawTile = function() {
     var searchRadius = Math.sqrt(spanInMeters * spanInMeters + spanInMeters * spanInMeters);
     searchRadius += maxWalkDistance;
 
+    // console.log('Search Radius: ', searchRadius);
     var stationsAround = self.quadtree.searchInRadius(latlng.lat, latlng.lng, searchRadius);
 
     ctx.globalCompositeOperation = 'source-over';
@@ -545,6 +605,9 @@ Mapnificent.prototype.drawTile = function() {
 
     for (var i = 0; i < self.positions.length; i += 1) {
       var drawStations = self.positions[i].getReachableStations(stationsAround, start, tileSize);
+
+      // console.log('Draw Stations length: ', self.positions[i].getReachableStations(stationsAround, start, tileSize));
+
       for (var j = 0; j < drawStations.length; j += 1) {
         ctx.beginPath();
         ctx.arc(drawStations[j].x, drawStations[j].y,
